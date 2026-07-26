@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Store, LogOut, Check, X, Loader2 } from "lucide-react";
+import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2 } from "lucide-react";
 
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
@@ -91,6 +91,7 @@ function Sidebar({ view, setView, onLogout }) {
   const items = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "brands", label: "Brands", icon: Store },
+    { id: "payouts", label: "Payouts", icon: Wallet },
   ];
   return (
     <div style={{ width: 220, flexShrink: 0, background: C.ink, color: C.sand, minHeight: "100vh", padding: "24px 18px", display: "flex", flexDirection: "column" }}>
@@ -224,22 +225,81 @@ function Brands({ brands, loading, token, onUpdated }) {
   );
 }
 
+function Payouts({ payouts, loading, token, onUpdated }) {
+  const [busyId, setBusyId] = useState(null);
+  const [refDrafts, setRefDrafts] = useState({});
+  const [error, setError] = useState("");
+
+  const markPaid = async (brandId) => {
+    setBusyId(brandId);
+    setError("");
+    try {
+      const result = await api(`/admin/payouts/${brandId}/mark-paid`, { method: "POST", body: JSON.stringify({ reference: refDrafts[brandId] || "" }) }, token);
+      onUpdated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (loading) return <div><h1 style={h1}>Payouts</h1><div style={{ marginTop: 20 }}><Loading /></div></div>;
+
+  return (
+    <div>
+      <h1 style={h1}>Payouts due</h1>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted, marginTop: 6 }}>
+        Based on shipped/delivered items not yet marked paid. Send the bank transfer yourself, then mark it here.
+      </p>
+      {error && <p style={{ color: C.danger, fontFamily: "Inter, sans-serif", fontSize: 13, marginTop: 10 }}>{error}</p>}
+      <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+        {payouts.length === 0 ? (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted }}>Nothing pending — every shipped item has been paid out.</p>
+        ) : (
+          payouts.map((p) => (
+            <div key={p.brand_id} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <p style={{ fontFamily: "Fraunces, serif", fontSize: 16, color: C.ink, margin: 0 }}>{p.brand_name}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 0" }}>{p.item_count} item(s) · {money(p.amount_due)} due</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  placeholder="Transfer reference"
+                  value={refDrafts[p.brand_id] || ""}
+                  onChange={(e) => setRefDrafts((prev) => ({ ...prev, [p.brand_id]: e.target.value }))}
+                  style={inputStyle}
+                />
+                <button onClick={() => markPaid(p.brand_id)} disabled={busyId === p.brand_id} style={{ display: "flex", alignItems: "center", gap: 6, background: C.ink, color: C.warm, border: "none", padding: "8px 14px", fontFamily: "Inter, sans-serif", fontSize: 13, cursor: "pointer" }}>
+                  <Check size={14} /> {busyId === p.brand_id ? "Saving..." : "Mark paid"}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState(null);
   const [view, setView] = useState("overview");
   const [stats, setStats] = useState(null);
   const [brands, setBrands] = useState([]);
+  const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [statsRes, brandsRes] = await Promise.all([
+      const [statsRes, brandsRes, payoutsRes] = await Promise.all([
         api("/admin/stats", {}, tok),
         api("/admin/brands", {}, tok),
+        api("/admin/payouts", {}, tok),
       ]);
       setStats(statsRes);
       setBrands(brandsRes);
+      setPayouts(payoutsRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -263,6 +323,7 @@ export default function AdminDashboard() {
       <main style={{ flex: 1, padding: "32px 40px", maxWidth: 900 }}>
         {view === "overview" && <Overview stats={stats} loading={loading} />}
         {view === "brands" && <Brands brands={brands} loading={loading} token={token} onUpdated={refresh} />}
+        {view === "payouts" && <Payouts payouts={payouts} loading={loading} token={token} onUpdated={refresh} />}
       </main>
     </div>
   );
