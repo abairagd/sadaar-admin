@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, Download, Mail } from "lucide-react";
+import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, Download, Mail, Sparkles } from "lucide-react";
 
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
@@ -134,6 +134,7 @@ function Sidebar({ view, setView, onLogout }) {
     { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "discounts", label: "Discounts", icon: Tag },
     { id: "messages", label: "Messages", icon: Mail },
+    { id: "spotlight", label: "Spotlight", icon: Sparkles },
     { id: "reports", label: "Reports", icon: Download },
   ];
   return (
@@ -588,6 +589,44 @@ function Messages({ messages, loading, token, onUpdated }) {
   );
 }
 
+function SpotlightAdmin({ spotlights, loading }) {
+  if (loading) return <div><h1 style={h1}>Spotlight</h1><div style={{ marginTop: 20 }}><Loading /></div></div>;
+  const paid = spotlights.filter((s) => s.payment_status === "paid");
+  const revenue = paid.reduce((s, x) => s + Number(x.price), 0);
+  const active = paid.filter((s) => new Date(s.ends_at) > new Date());
+
+  return (
+    <div>
+      <h1 style={h1}>Spotlight</h1>
+      <div style={{ display: "flex", gap: 14, marginTop: 20, marginBottom: 28, flexWrap: "wrap" }}>
+        <div style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 18, flex: 1, minWidth: 160 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: 0 }}>Total revenue</p>
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: C.ink, margin: "6px 0 0" }}>{money(revenue)}</p>
+        </div>
+        <div style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 18, flex: 1, minWidth: 160 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: 0 }}>Currently active</p>
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: C.ink, margin: "6px 0 0" }}>{active.length}</p>
+        </div>
+      </div>
+      <h2 style={h2}>All purchases</h2>
+      {spotlights.length === 0 ? (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted }}>No spotlight purchases yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {spotlights.map((s) => (
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: C.warm, border: `1px solid ${C.line}`, fontFamily: "Inter, sans-serif", fontSize: 13 }}>
+              <span>{s.brand_name} — {s.duration_days} days — {money(s.price)}</span>
+              <span style={{ color: s.payment_status === "paid" ? "#2F5B3C" : C.muted }}>
+                {s.payment_status === "paid" ? `Paid, ends ${new Date(s.ends_at).toLocaleDateString()}` : "Unpaid"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState(null);
   const [view, setView] = useState("overview");
@@ -596,23 +635,26 @@ export default function AdminDashboard() {
   const [payouts, setPayouts] = useState([]);
   const [discountCodes, setDiscountCodes] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [spotlights, setSpotlights] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [statsRes, brandsRes, payoutsRes, discountsRes, messagesRes] = await Promise.all([
+      const [statsRes, brandsRes, payoutsRes, discountsRes, messagesRes, spotlightsRes] = await Promise.all([
         api("/admin/stats", {}, tok),
         api("/admin/brands", {}, tok),
         api("/admin/payouts", {}, tok),
         api("/discounts", {}, tok),
         api("/support", {}, tok),
+        api("/spotlight/admin/all", {}, tok),
       ]);
       setStats(statsRes);
       setBrands(brandsRes);
       setPayouts(payoutsRes);
       setDiscountCodes(discountsRes);
       setMessages(messagesRes);
+      setSpotlights(spotlightsRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -639,6 +681,7 @@ export default function AdminDashboard() {
         {view === "payouts" && <Payouts payouts={payouts} loading={loading} token={token} onUpdated={refresh} />}
         {view === "discounts" && <Discounts codes={discountCodes} loading={loading} token={token} onUpdated={refresh} />}
         {view === "messages" && <Messages messages={messages} loading={loading} token={token} onUpdated={refresh} />}
+        {view === "spotlight" && <SpotlightAdmin spotlights={spotlights} loading={loading} />}
         {view === "reports" && <Reports token={token} />}
       </main>
     </div>
