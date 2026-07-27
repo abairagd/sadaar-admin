@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus } from "lucide-react";
+import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, Download } from "lucide-react";
 
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
@@ -40,6 +40,32 @@ async function api(path, options = {}, token) {
 
 function money(n) {
   return `SAR ${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+// Converts an array of flat objects to a CSV string. Wraps every value in quotes
+// and escapes internal quotes, since order addresses/names can contain commas.
+function toCSV(rows) {
+  if (rows.length === 0) return "";
+  const headers = Object.keys(rows[0]);
+  const escape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const lines = [headers.map(escape).join(",")];
+  for (const row of rows) {
+    lines.push(headers.map((h) => escape(row[h])).join(","));
+  }
+  return lines.join("\n");
+}
+
+function downloadCSV(filename, rows) {
+  const csv = toCSV(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 const inputStyle = { border: `1px solid ${C.line}`, padding: "11px 13px", fontFamily: "Inter, sans-serif", fontSize: 14, background: C.warm, color: C.char };
@@ -107,6 +133,7 @@ function Sidebar({ view, setView, onLogout }) {
     { id: "brands", label: "Brands", icon: Store },
     { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "discounts", label: "Discounts", icon: Tag },
+    { id: "reports", label: "Reports", icon: Download },
   ];
   return (
     <div className="sadaar-sidebar" style={{ width: 220, flexShrink: 0, background: C.ink, color: C.sand, minHeight: "100vh", padding: "24px 18px", display: "flex", flexDirection: "column" }}>
@@ -433,6 +460,66 @@ function Discounts({ codes, loading, token, onUpdated }) {
   );
 }
 
+function Reports({ token }) {
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [error, setError] = useState("");
+
+  const exportOrders = async () => {
+    setLoadingOrders(true);
+    setError("");
+    try {
+      const rows = await api("/admin/orders", {}, token);
+      if (rows.length === 0) { setError("No orders yet to export."); return; }
+      downloadCSV(`sadaar-orders-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const exportPayouts = async () => {
+    setLoadingItems(true);
+    setError("");
+    try {
+      const rows = await api("/admin/order-items", {}, token);
+      if (rows.length === 0) { setError("No order items yet to export."); return; }
+      downloadCSV(`sadaar-payouts-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1 style={h1}>Reports</h1>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted, marginTop: 6, marginBottom: 20 }}>
+        Download your data as a CSV file to open in Excel, Google Sheets, or share with an accountant.
+      </p>
+      {error && <p style={{ color: C.danger, fontFamily: "Inter, sans-serif", fontSize: 13, marginBottom: 16 }}>{error}</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 420 }}>
+        <div style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 18 }}>
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 16, color: C.ink, margin: 0 }}>All orders</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 12px" }}>One row per order — totals, discounts, shipping, payment status, customer contact.</p>
+          <button onClick={exportOrders} disabled={loadingOrders} style={{ display: "flex", alignItems: "center", gap: 6, background: C.ink, color: C.warm, border: "none", padding: "9px 16px", fontFamily: "Inter, sans-serif", fontSize: 13, cursor: "pointer" }}>
+            <Download size={14} /> {loadingOrders ? "Preparing..." : "Download orders CSV"}
+          </button>
+        </div>
+        <div style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 18 }}>
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 16, color: C.ink, margin: 0 }}>Commission & payouts ledger</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 12px" }}>One row per line item — brand, product, commission, payout amount and status, tracking.</p>
+          <button onClick={exportPayouts} disabled={loadingItems} style={{ display: "flex", alignItems: "center", gap: 6, background: C.ink, color: C.warm, border: "none", padding: "9px 16px", fontFamily: "Inter, sans-serif", fontSize: 13, cursor: "pointer" }}>
+            <Download size={14} /> {loadingItems ? "Preparing..." : "Download payouts CSV"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState(null);
   const [view, setView] = useState("overview");
@@ -480,6 +567,7 @@ export default function AdminDashboard() {
         {view === "brands" && <Brands brands={brands} loading={loading} token={token} onUpdated={refresh} />}
         {view === "payouts" && <Payouts payouts={payouts} loading={loading} token={token} onUpdated={refresh} />}
         {view === "discounts" && <Discounts codes={discountCodes} loading={loading} token={token} onUpdated={refresh} />}
+        {view === "reports" && <Reports token={token} />}
       </main>
     </div>
   );
