@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2 } from "lucide-react";
+import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus } from "lucide-react";
 
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
@@ -106,6 +106,7 @@ function Sidebar({ view, setView, onLogout }) {
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "brands", label: "Brands", icon: Store },
     { id: "payouts", label: "Payouts", icon: Wallet },
+    { id: "discounts", label: "Discounts", icon: Tag },
   ];
   return (
     <div className="sadaar-sidebar" style={{ width: 220, flexShrink: 0, background: C.ink, color: C.sand, minHeight: "100vh", padding: "24px 18px", display: "flex", flexDirection: "column" }}>
@@ -295,25 +296,129 @@ function Payouts({ payouts, loading, token, onUpdated }) {
   );
 }
 
+function Discounts({ codes, loading, token, onUpdated }) {
+  const [showForm, setShowForm] = useState(false);
+  const [code, setCode] = useState("");
+  const [type, setType] = useState("percent");
+  const [value, setValue] = useState("");
+  const [minSubtotal, setMinSubtotal] = useState("");
+  const [maxUses, setMaxUses] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  const createCode = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      await api("/discounts", {
+        method: "POST",
+        body: JSON.stringify({
+          code, type, value: Number(value),
+          minSubtotal: minSubtotal ? Number(minSubtotal) : 0,
+          maxUses: maxUses ? Number(maxUses) : null,
+        }),
+      }, token);
+      setCode(""); setValue(""); setMinSubtotal(""); setMaxUses(""); setShowForm(false);
+      onUpdated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleActive = async (c) => {
+    setBusyId(c.id);
+    try {
+      await api(`/discounts/${c.id}/status`, { method: "PATCH", body: JSON.stringify({ active: !c.active }) }, token);
+      onUpdated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (loading) return <div><h1 style={h1}>Discounts</h1><div style={{ marginTop: 20 }}><Loading /></div></div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={h1}>Discount codes</h1>
+        <button onClick={() => setShowForm((s) => !s)} style={{ display: "flex", alignItems: "center", gap: 6, background: C.ink, color: C.warm, border: "none", padding: "9px 16px", fontFamily: "Inter, sans-serif", fontSize: 13, cursor: "pointer" }}>
+          {showForm ? <X size={14} /> : <Plus size={14} />} {showForm ? "Cancel" : "New code"}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={createCode} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 20, marginTop: 16, display: "flex", flexDirection: "column", gap: 12, maxWidth: 420 }}>
+          <input required value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE (e.g. WELCOME10)" style={inputStyle} />
+          <select value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}>
+            <option value="percent">Percent off</option>
+            <option value="fixed">Fixed amount off (SAR)</option>
+          </select>
+          <input required value={value} onChange={(e) => setValue(e.target.value)} type="number" placeholder={type === "percent" ? "e.g. 10 (for 10%)" : "e.g. 50 (for SAR 50)"} style={inputStyle} />
+          <input value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} type="number" placeholder="Minimum subtotal to qualify (optional)" style={inputStyle} />
+          <input value={maxUses} onChange={(e) => setMaxUses(e.target.value)} type="number" placeholder="Max total uses (optional, blank = unlimited)" style={inputStyle} />
+          {error && <p style={{ color: C.danger, fontFamily: "Inter, sans-serif", fontSize: 12, margin: 0 }}>{error}</p>}
+          <button type="submit" disabled={saving} style={{ background: C.ink, color: C.warm, border: "none", padding: "11px 0", fontFamily: "Inter, sans-serif", fontSize: 14, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving..." : "Create code"}
+          </button>
+        </form>
+      )}
+
+      <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+        {codes.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted }}>No discount codes yet.</p>}
+        {codes.map((c) => (
+          <div key={c.id} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <p style={{ fontFamily: "Fraunces, serif", fontSize: 16, color: C.ink, margin: 0 }}>{c.code}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 0" }}>
+                {c.type === "percent" ? `${c.value}% off` : `${money(c.value)} off`}
+                {Number(c.min_subtotal) > 0 && ` · min ${money(c.min_subtotal)}`}
+                {c.max_uses !== null && ` · ${c.uses_count}/${c.max_uses} used`}
+                {c.max_uses === null && ` · ${c.uses_count} used`}
+              </p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", padding: "3px 9px", borderRadius: 3, background: c.active ? "#DDE7DB" : "#F0DAD5", color: c.active ? "#2F5B3C" : C.danger }}>
+                {c.active ? "Active" : "Inactive"}
+              </span>
+              <button onClick={() => toggleActive(c)} disabled={busyId === c.id} style={{ background: "none", border: `1px solid ${C.line}`, padding: "6px 12px", fontFamily: "Inter, sans-serif", fontSize: 12, cursor: "pointer", color: C.char }}>
+                {c.active ? "Deactivate" : "Activate"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState(null);
   const [view, setView] = useState("overview");
   const [stats, setStats] = useState(null);
   const [brands, setBrands] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [discountCodes, setDiscountCodes] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [statsRes, brandsRes, payoutsRes] = await Promise.all([
+      const [statsRes, brandsRes, payoutsRes, discountsRes] = await Promise.all([
         api("/admin/stats", {}, tok),
         api("/admin/brands", {}, tok),
         api("/admin/payouts", {}, tok),
+        api("/discounts", {}, tok),
       ]);
       setStats(statsRes);
       setBrands(brandsRes);
       setPayouts(payoutsRes);
+      setDiscountCodes(discountsRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -338,6 +443,7 @@ export default function AdminDashboard() {
         {view === "overview" && <Overview stats={stats} loading={loading} />}
         {view === "brands" && <Brands brands={brands} loading={loading} token={token} onUpdated={refresh} />}
         {view === "payouts" && <Payouts payouts={payouts} loading={loading} token={token} onUpdated={refresh} />}
+        {view === "discounts" && <Discounts codes={discountCodes} loading={loading} token={token} onUpdated={refresh} />}
       </main>
     </div>
   );
