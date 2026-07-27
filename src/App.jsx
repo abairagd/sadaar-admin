@@ -173,6 +173,8 @@ function Overview({ stats, loading }) {
 function Brands({ brands, loading, token, onUpdated }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
+  const [commissionDrafts, setCommissionDrafts] = useState({});
+  const [savingCommission, setSavingCommission] = useState(null);
 
   const setStatus = async (id, status) => {
     setBusyId(id);
@@ -184,6 +186,22 @@ function Brands({ brands, loading, token, onUpdated }) {
       setError(err.message);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const saveCommission = async (id) => {
+    const value = commissionDrafts[id];
+    if (value === undefined || value === "") return;
+    setSavingCommission(id);
+    setError("");
+    try {
+      await api(`/admin/brands/${id}/commission`, { method: "PATCH", body: JSON.stringify({ commissionRate: Number(value) }) }, token);
+      setCommissionDrafts((prev) => { const next = { ...prev }; delete next[id]; return next; });
+      onUpdated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingCommission(null);
     }
   };
 
@@ -223,9 +241,27 @@ function Brands({ brands, loading, token, onUpdated }) {
           <div key={b.id} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>
               <p style={{ fontFamily: "Fraunces, serif", fontSize: 15, color: C.ink, margin: 0 }}>{b.name}</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "2px 0 0" }}>{b.category} · {b.contact_email} · {b.commission_rate}% commission</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "2px 0 0" }}>{b.category} · {b.contact_email}</p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  placeholder={`${b.commission_rate}%`}
+                  value={commissionDrafts[b.id] ?? ""}
+                  onChange={(e) => setCommissionDrafts((prev) => ({ ...prev, [b.id]: e.target.value }))}
+                  style={{ ...inputStyle, width: 64, padding: "6px 8px" }}
+                />
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted }}>%</span>
+                {commissionDrafts[b.id] !== undefined && commissionDrafts[b.id] !== "" && Number(commissionDrafts[b.id]) !== Number(b.commission_rate) && (
+                  <button onClick={() => saveCommission(b.id)} disabled={savingCommission === b.id} style={{ background: C.ink, color: C.warm, border: "none", padding: "6px 10px", fontFamily: "Inter, sans-serif", fontSize: 12, cursor: "pointer" }}>
+                    {savingCommission === b.id ? "..." : "Save"}
+                  </button>
+                )}
+              </div>
               <Badge status={b.status} />
               {b.status === "active" ? (
                 <button onClick={() => setStatus(b.id, "suspended")} disabled={busyId === b.id} style={{ background: "none", border: `1px solid ${C.line}`, padding: "6px 12px", fontFamily: "Inter, sans-serif", fontSize: 12, cursor: "pointer", color: C.char }}>Suspend</button>
