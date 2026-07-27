@@ -4,7 +4,7 @@ import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, D
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
 const C = {
-  ink: "#16261C", sand: "#F3ECDD", warm: "#FBF8F1", bronze: "#B08D57",
+  ink: "#14282E", sand: "#F3ECDD", warm: "#FBF8F1", bronze: "#B08D57",
   char: "#22201B", line: "#DCD2BB", muted: "#7A7566", danger: "#A3402F",
 };
 
@@ -140,15 +140,15 @@ function Sidebar({ view, setView, onLogout }) {
   return (
     <div className="sadaar-sidebar" style={{ width: 220, flexShrink: 0, background: C.ink, color: C.sand, minHeight: "100vh", padding: "24px 18px", display: "flex", flexDirection: "column" }}>
       <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 20, marginBottom: 2 }}>SADAAR</div>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9CA394", marginBottom: 28 }} className="sadaar-sidebar-sub">Admin</p>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#98A3A5", marginBottom: 28 }} className="sadaar-sidebar-sub">Admin</p>
       <div className="sadaar-sidebar-nav" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {items.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setView(id)} style={{ display: "flex", alignItems: "center", gap: 10, background: view === id ? "#22331F" : "none", border: "none", cursor: "pointer", color: view === id ? C.sand : "#B7BCA9", fontFamily: "Inter, sans-serif", fontSize: 14, padding: "10px 10px", textAlign: "left" }}>
+          <button key={id} onClick={() => setView(id)} style={{ display: "flex", alignItems: "center", gap: 10, background: view === id ? "#1C3336" : "none", border: "none", cursor: "pointer", color: view === id ? C.sand : "#B4BDBE", fontFamily: "Inter, sans-serif", fontSize: 14, padding: "10px 10px", textAlign: "left" }}>
             <Icon size={16} /> {label}
           </button>
         ))}
       </div>
-      <button onClick={onLogout} className="sadaar-logout-btn" style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: "#B7BCA9", fontFamily: "Inter, sans-serif", fontSize: 13, padding: "10px 10px" }}>
+      <button onClick={onLogout} className="sadaar-logout-btn" style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: "#B4BDBE", fontFamily: "Inter, sans-serif", fontSize: 13, padding: "10px 10px" }}>
         <LogOut size={15} /> Log out
       </button>
     </div>
