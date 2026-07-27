@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, Download } from "lucide-react";
+import { LayoutDashboard, Store, Wallet, LogOut, Check, X, Loader2, Tag, Plus, Download, Mail } from "lucide-react";
 
 const API_BASE = "https://sadaar-backend-production.up.railway.app/api";
 
@@ -133,6 +133,7 @@ function Sidebar({ view, setView, onLogout }) {
     { id: "brands", label: "Brands", icon: Store },
     { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "discounts", label: "Discounts", icon: Tag },
+    { id: "messages", label: "Messages", icon: Mail },
     { id: "reports", label: "Reports", icon: Download },
   ];
   return (
@@ -520,6 +521,73 @@ function Reports({ token }) {
   );
 }
 
+function Messages({ messages, loading, token, onUpdated }) {
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+
+  const markRead = async (id) => {
+    setBusyId(id);
+    setError("");
+    try {
+      await api(`/support/${id}/read`, { method: "PATCH" }, token);
+      onUpdated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (loading) return <div><h1 style={h1}>Messages</h1><div style={{ marginTop: 20 }}><Loading /></div></div>;
+
+  const newMessages = messages.filter((m) => m.status === "new");
+  const readMessages = messages.filter((m) => m.status !== "new");
+
+  return (
+    <div>
+      <h1 style={h1}>Messages</h1>
+      {error && <p style={{ color: C.danger, fontFamily: "Inter, sans-serif", fontSize: 13, marginTop: 10 }}>{error}</p>}
+
+      <h2 style={h2}>New ({newMessages.length})</h2>
+      {newMessages.length === 0 ? (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted }}>No new messages.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {newMessages.map((m) => (
+            <div key={m.id} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                <div>
+                  <p style={{ fontFamily: "Fraunces, serif", fontSize: 16, color: C.ink, margin: 0 }}>{m.subject || "(no subject)"}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 0" }}>{m.name} · {m.email} · {new Date(m.created_at).toLocaleString()}</p>
+                </div>
+                <button onClick={() => markRead(m.id)} disabled={busyId === m.id} style={{ background: "none", border: `1px solid ${C.line}`, padding: "6px 12px", fontFamily: "Inter, sans-serif", fontSize: 12, cursor: "pointer", color: C.char, whiteSpace: "nowrap" }}>
+                  Mark read
+                </button>
+              </div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: C.char, marginTop: 10, whiteSpace: "pre-wrap" }}>{m.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h2 style={h2}>Read</h2>
+      {readMessages.length === 0 ? (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.muted }}>Nothing here yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {readMessages.map((m) => (
+            <div key={m.id} style={{ background: C.warm, border: `1px solid ${C.line}`, padding: 14, opacity: 0.75 }}>
+              <p style={{ fontFamily: "Fraunces, serif", fontSize: 15, color: C.ink, margin: 0 }}>{m.subject || "(no subject)"}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: C.muted, margin: "4px 0 0" }}>{m.name} · {m.email} · {new Date(m.created_at).toLocaleString()}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: C.char, marginTop: 8, whiteSpace: "pre-wrap" }}>{m.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState(null);
   const [view, setView] = useState("overview");
@@ -527,21 +595,24 @@ export default function AdminDashboard() {
   const [brands, setBrands] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [discountCodes, setDiscountCodes] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [statsRes, brandsRes, payoutsRes, discountsRes] = await Promise.all([
+      const [statsRes, brandsRes, payoutsRes, discountsRes, messagesRes] = await Promise.all([
         api("/admin/stats", {}, tok),
         api("/admin/brands", {}, tok),
         api("/admin/payouts", {}, tok),
         api("/discounts", {}, tok),
+        api("/support", {}, tok),
       ]);
       setStats(statsRes);
       setBrands(brandsRes);
       setPayouts(payoutsRes);
       setDiscountCodes(discountsRes);
+      setMessages(messagesRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -567,6 +638,7 @@ export default function AdminDashboard() {
         {view === "brands" && <Brands brands={brands} loading={loading} token={token} onUpdated={refresh} />}
         {view === "payouts" && <Payouts payouts={payouts} loading={loading} token={token} onUpdated={refresh} />}
         {view === "discounts" && <Discounts codes={discountCodes} loading={loading} token={token} onUpdated={refresh} />}
+        {view === "messages" && <Messages messages={messages} loading={loading} token={token} onUpdated={refresh} />}
         {view === "reports" && <Reports token={token} />}
       </main>
     </div>
