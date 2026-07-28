@@ -206,6 +206,11 @@ function Brands({ brands, loading, token, onUpdated }) {
   const [savingCommission, setSavingCommission] = useState(null);
 
   const setStatus = async (id, status) => {
+    const messages = {
+      active: "Activate this brand? They'll be able to log in and sell on SADAAR.",
+      suspended: "Suspend this brand? Their listings will stop showing to customers.",
+    };
+    if (!window.confirm(messages[status] || `Set this brand's status to ${status}?`)) return;
     setBusyId(id);
     setError("");
     try {
@@ -221,6 +226,7 @@ function Brands({ brands, loading, token, onUpdated }) {
   const saveCommission = async (id) => {
     const value = commissionDrafts[id];
     if (value === undefined || value === "") return;
+    if (!window.confirm(`Change this brand's commission rate to ${value}%? This only affects future orders.`)) return;
     setSavingCommission(id);
     setError("");
     try {
@@ -311,6 +317,7 @@ function Payouts({ payouts, loading, token, onUpdated }) {
   const [error, setError] = useState("");
 
   const markPaid = async (brandId) => {
+    if (!window.confirm("Mark all pending payouts for this brand as paid? Only do this after you've actually sent the bank transfer.")) return;
     setBusyId(brandId);
     setError("");
     try {
@@ -395,6 +402,7 @@ function Discounts({ codes, loading, token, onUpdated }) {
   };
 
   const toggleActive = async (c) => {
+    if (!window.confirm(c.active ? `Deactivate code "${c.code}"? Customers won't be able to use it anymore.` : `Reactivate code "${c.code}"?`)) return;
     setBusyId(c.id);
     try {
       await api(`/discounts/${c.id}/status`, { method: "PATCH", body: JSON.stringify({ active: !c.active }) }, token);
